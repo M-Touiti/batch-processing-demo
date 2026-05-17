@@ -7,6 +7,7 @@ import com.demo.batch.infrastructure.persistence.repository.ValidationErrorJpaRe
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import com.demo.batch.exposition.BatchApplication;
 import org.springframework.batch.core.*;
 import org.springframework.batch.test.JobLauncherTestUtils;
 import org.springframework.batch.test.JobRepositoryTestUtils;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 3. Job produces a report file with correct counts
  */
 @SpringBatchTest
-@SpringBootTest
+@SpringBootTest(classes = BatchApplication.class)
 @Testcontainers
 class CsvImportJobIntegrationTest {
 

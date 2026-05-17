@@ -2,7 +2,7 @@
 
 A production-grade Spring Batch microservice for processing financial transaction files (CSV and Excel). Demonstrates enterprise batch patterns: chunked processing, skip policy, parallel partitioning, validation, currency conversion, and job monitoring via REST API.
 
-Built as a portfolio project applicable to banking, fintech, accounting, and any enterprise system dealing with large-scale file imports.
+Built as a project applicable to banking, fintech, accounting, and any enterprise system dealing with large-scale file imports.
 
 ---
 
@@ -61,13 +61,13 @@ Built as a portfolio project applicable to banking, fintech, accounting, and any
 
 ## Tech Stack
 
-- **Java 17** — Records, switch expressions, modern idioms
+- **Java 21** — Records, switch expressions, virtual threads ready
 - **Spring Batch 5.1** — Chunk-oriented processing, skip/retry, job repository
 - **Spring Boot 3.3** — Web, Actuator, Scheduling, Validation
 - **Spring Data JPA** — PostgreSQL persistence with batch inserts
 - **Apache POI 5.2** — Excel (.xlsx) file reading
 - **OpenCSV 5.9** — CSV report generation
-- **Testcontainers** — Real PostgreSQL in `@SpringBatchTest` integration tests
+- **Testcontainers 1.20** — Real PostgreSQL in `@SpringBatchTest` integration tests
 - **Docker / Docker Compose** — Full local environment with pgAdmin
 
 ---
@@ -75,14 +75,14 @@ Built as a portfolio project applicable to banking, fintech, accounting, and any
 ## Getting Started
 
 ### Prerequisites
-- Java 17+
+- Java 21+
 - Docker & Docker Compose
 
 ### Run locally
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-username/batch-processing-demo.git
+git clone https://github.com/M-Touiti/batch-processing-demo.git
 cd batch-processing-demo
 
 # 2. Start PostgreSQL + pgAdmin
@@ -102,11 +102,14 @@ open http://localhost:5050  # admin@demo.com / admin
 ### Run tests
 
 ```bash
-# Unit tests (Mockito — no infrastructure)
-./mvnw test -pl domain,application
+# Unit tests only (Mockito — no infrastructure needed)
+./mvnw test
 
 # Integration tests (@SpringBatchTest + Testcontainers — requires Docker)
-./mvnw verify -pl exposition
+# Note: excluded from the default build; run explicitly when Docker is available.
+# On Docker Desktop for Windows, enable "Expose daemon on tcp://localhost:2375"
+# in Settings → General, then:
+./mvnw test -pl exposition -Dsurefire.excludes=
 ```
 
 ---
