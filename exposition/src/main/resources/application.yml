@@ -1,0 +1,77 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: batch-processing-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/batch_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 100           # JPA batch inserts — matches Spring Batch chunk size
+        order_inserts: true         # needed for batch insert optimization
+        order_updates: true
+
+  # Spring Batch — use our PostgreSQL DB for metadata tables (not H2 in-memory)
+  batch:
+    job:
+      enabled: false               # don't auto-run jobs on startup
+    jdbc:
+      initialize-schema: always    # create BATCH_* tables automatically
+
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+
+# ─────────────────────────────────────────────────────────────────
+# Application config
+# ─────────────────────────────────────────────────────────────────
+app:
+  batch:
+    input-directory:  ${BATCH_INPUT_DIR:./batch-input}
+    output-directory: ${BATCH_OUTPUT_DIR:./batch-output}
+    scheduler:
+      enabled: ${SCHEDULER_ENABLED:true}
+      cron: "0 */5 * * * *"       # every 5 minutes
+
+# ─────────────────────────────────────────────────────────────────
+# Actuator
+# ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,batch
+  endpoint:
+    health:
+      show-details: always
+    batch:
+      enabled: true               # exposes Spring Batch job execution info
+
+# ─────────────────────────────────────────────────────────────────
+# OpenAPI
+# ─────────────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.demo.batch: INFO
+    org.springframework.batch: INFO

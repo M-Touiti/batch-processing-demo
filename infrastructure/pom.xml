@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>com.demo</groupId><artifactId>batch-processing-demo</artifactId><version>1.0.0</version></parent>
+    <artifactId>infrastructure</artifactId>
+    <description>Spring Batch config, CSV/Excel readers, processors, writers, JPA adapters</description>
+    <dependencies>
+        <dependency><groupId>com.demo</groupId><artifactId>application</artifactId></dependency>
+
+        <!-- Spring Batch -->
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-batch</artifactId></dependency>
+
+        <!-- JPA + PostgreSQL -->
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+        <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
+
+        <!-- Apache POI — Excel -->
+        <dependency><groupId>org.apache.poi</groupId><artifactId>poi</artifactId></dependency>
+        <dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId></dependency>
+
+        <!-- OpenCSV — report generation -->
+        <dependency><groupId>com.opencsv</groupId><artifactId>opencsv</artifactId></dependency>
+
+        <!-- Web (for REST in exposition) -->
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+
+        <!-- Test -->
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.springframework.batch</groupId><artifactId>spring-batch-test</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>test</scope></dependency>
+    </dependencies>
+</project>

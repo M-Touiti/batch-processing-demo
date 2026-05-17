@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: batch-postgres
+    environment:
+      POSTGRES_DB: batch_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: batch-processing-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/batch_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      BATCH_INPUT_DIR: /batch-input
+      BATCH_OUTPUT_DIR: /batch-output
+      SCHEDULER_ENABLED: "true"
+    volumes:
+      - ./sample-data:/batch-input      # mount sample files as input
+      - batch_output:/batch-output      # persist generated reports
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin — visual DB explorer
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: batch-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@demo.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  batch_output:
