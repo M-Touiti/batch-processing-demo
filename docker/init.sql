@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS processed_transactions (
     account_id          VARCHAR(100)    NOT NULL,
     amount              NUMERIC(19,4)   NOT NULL,
     amount_in_eur       NUMERIC(19,4),
-    currency            CHAR(3)         NOT NULL,
+    currency            VARCHAR(3)      NOT NULL,
     exchange_rate       NUMERIC(19,6),
     type                VARCHAR(20)     NOT NULL,
     value_date          DATE,

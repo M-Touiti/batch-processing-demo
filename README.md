@@ -78,38 +78,45 @@ Built as a project applicable to banking, fintech, accounting, and any enterpris
 - Java 21+
 - Docker & Docker Compose
 
-### Run locally
+### Option A — full Docker stack (recommended)
 
 ```bash
 # 1. Clone the repo
 git clone https://github.com/M-Touiti/batch-processing-demo.git
 cd batch-processing-demo
 
-# 2. Start PostgreSQL + pgAdmin
-docker-compose up -d postgres pgadmin
+# 2. Start everything (PostgreSQL + app + pgAdmin)
+docker compose up -d
 
-# 3. Build and run (scheduler watches ./batch-input/ automatically)
-./mvnw clean install -DskipTests
-./mvnw spring-boot:run -pl exposition
-
-# 4. Open Swagger UI
+# 3. Open Swagger UI
 open http://localhost:8080/swagger-ui.html
 
-# 5. Open pgAdmin (DB browser)
+# 4. Open pgAdmin (DB browser)
 open http://localhost:5050  # admin@demo.com / admin
+```
+
+### Option B — local Maven + external DB
+
+```bash
+# 1. Start only the database
+docker compose up -d postgres pgadmin
+
+# 2. Build and run (scheduler watches ./batch-input/ automatically)
+mvn clean install -DskipTests
+mvn spring-boot:run -pl exposition
 ```
 
 ### Run tests
 
 ```bash
 # Unit tests only (Mockito — no infrastructure needed)
-./mvnw test
+mvn test
 
 # Integration tests (@SpringBatchTest + Testcontainers — requires Docker)
-# Note: excluded from the default build; run explicitly when Docker is available.
+# Excluded from the default build. Run explicitly when Docker is available.
 # On Docker Desktop for Windows, enable "Expose daemon on tcp://localhost:2375"
 # in Settings → General, then:
-./mvnw test -pl exposition -Dsurefire.excludes=
+mvn test -pl exposition -Dsurefire.excludes=
 ```
 
 ---
