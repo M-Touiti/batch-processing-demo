@@ -21,7 +21,7 @@ jobs:
           cache: maven
 
       - name: Unit tests
-        run: mvn test
+        run: mvn install
 
       - name: Integration tests (Testcontainers + PostgreSQL)
         run: mvn test -pl exposition -Dsurefire.excludes=
