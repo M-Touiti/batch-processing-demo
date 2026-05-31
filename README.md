@@ -1,5 +1,10 @@
 # batch-processing-demo
 
+[![CI](https://github.com/M-Touiti/batch-processing-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/M-Touiti/batch-processing-demo/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-21-blue?logo=openjdk)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A production-grade Spring Batch microservice for processing financial transaction files (CSV and Excel). Demonstrates enterprise batch patterns: chunked processing, skip policy, parallel partitioning, validation, currency conversion, and job monitoring via REST API.
 
 Built as a project applicable to banking, fintech, accounting, and any enterprise system dealing with large-scale file imports.
@@ -8,34 +13,70 @@ Built as a project applicable to banking, fintech, accounting, and any enterpris
 
 ## Architecture
 
+### Module structure (Hexagonal / Ports & Adapters)
+
+```mermaid
+graph TD
+    subgraph exposition["Exposition — Spring Boot entry point"]
+        ctrl["BatchJobController\n(REST API)"]
+        sched["BatchScheduler\n(@Scheduled every 5 min)"]
+    end
+
+    subgraph application["Application — Use cases & ports"]
+        svc["BatchJobService"]
+        ports["Output Ports\nBatchJobLauncherPort\nImportJobRepositoryPort\nValidationErrorRepositoryPort"]
+    end
+
+    subgraph infrastructure["Infrastructure — Spring Batch + JPA"]
+        launcher["BatchJobLauncherAdapter"]
+        job["transactionImportJob\nStep 1: importStep → Step 2: reportStep"]
+        adapters["JPA Repository Adapters"]
+    end
+
+    subgraph domain["Domain — Pure models & exceptions"]
+        models["TransactionRecord · ProcessedTransaction\nImportJob · ValidationError · FileFormat"]
+    end
+
+    subgraph pg["PostgreSQL"]
+        app_db[("import_jobs\nprocessed_transactions\nvalidation_errors")]
+        batch_db[("BATCH_JOB_EXECUTION\nBATCH_STEP_EXECUTION\n(Spring Batch metadata)")]
+    end
+
+    ctrl & sched --> svc
+    svc --> ports
+    ports --> launcher & adapters
+    launcher --> job
+    launcher --> batch_db
+    adapters --> app_db
+    application --> domain
+    infrastructure --> application
+    exposition --> application
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    TRANSACTION IMPORT JOB                        │
-│                                                                  │
-│  Trigger: POST /api/v1/batch/jobs  or  @Scheduled (every 5 min) │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Step 1: importStep  (chunk-oriented, 100 records/chunk) │    │
-│  │                                                         │    │
-│  │  Reader          Processor              Writer          │    │
-│  │  ──────          ─────────              ──────          │    │
-│  │  CSV reader  →   Validate fields   →   JPA batch insert │    │
-│  │  Excel reader    Convert to EUR         (saveAll)       │    │
-│  │  (Apache POI)    Enrich record                          │    │
-│  │                  ↓ invalid                              │    │
-│  │              SkipPolicy                                 │    │
-│  │              → save ValidationError                     │    │
-│  │              → skip (continue job)                      │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Step 2: reportStep  (Tasklet)                           │    │
-│  │  → Generate CSV summary report (counts, timing, errors) │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│  JobExecutionListener: updates import_jobs table (RUNNING →     │
-│  COMPLETED / COMPLETED_WITH_ERRORS / FAILED)                    │
-└──────────────────────────────────────────────────────────────────┘
+
+### Batch job pipeline
+
+```mermaid
+flowchart LR
+    trigger(["REST API\nor Scheduler"])
+
+    subgraph step1["Step 1 — importStep  ·  chunk = 100  ·  4 parallel threads"]
+        reader["Reader\nCsvTransactionReader\nor ExcelTransactionReader"]
+        proc["Processor\nvalidate · convert to EUR · enrich"]
+        writer["Writer\nJPA batch insert\n(saveAll per chunk)"]
+        skip["SkipPolicy\nmax 1 000 skips"]
+    end
+
+    subgraph step2["Step 2 — reportStep  ·  Tasklet"]
+        report["CSV summary report\nbatch-output/report_*.csv"]
+    end
+
+    trigger --> reader
+    reader -- TransactionRecord --> proc
+    proc -- ProcessedTransaction --> writer
+    proc -- ValidationException --> skip
+    skip -. "persist error + skip record" .-> reader
+    writer --> step2
+    step2 --> report
 ```
 
 ---
@@ -217,8 +258,9 @@ curl "http://localhost:8080/api/v1/batch/jobs?status=COMPLETED_WITH_ERRORS"
 
 ```
 sample-data/
-├── transactions_2025_06.csv       ← 15 valid records (all currencies)
-└── transactions_with_errors.csv   ← 10 records (4 valid, 6 invalid — tests skip policy)
+├── transactions_2025_06.csv       ← 15 valid CSV records (all currencies)
+├── transactions_with_errors.csv   ← 10 records (4 valid, 6 invalid — tests skip policy)
+└── transactions_sample.xlsx       ← 20 valid Excel records (all currencies + types)
 ```
 
 ---

@@ -8,3 +8,15 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .DS_Store
+screenshots/*
+
+# Generated batch output (reports, processed results)
+batch-output/
+
+# Local environment overrides
+.env
+.env.local
+
+# Uploaded/imported files dropped into the input directory at runtime
+batch-input/
+!batch-input/.gitkeep
