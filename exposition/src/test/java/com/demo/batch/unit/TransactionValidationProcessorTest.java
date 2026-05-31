@@ -5,7 +5,7 @@ import com.demo.batch.domain.model.ProcessedTransaction;
 import com.demo.batch.domain.model.TransactionRecord;
 import com.demo.batch.domain.model.TransactionType;
 import com.demo.batch.infrastructure.batch.processor.TransactionValidationProcessor;
-import com.demo.batch.infrastructure.persistence.repository.ValidationErrorJpaRepository;
+import com.demo.batch.infrastructure.batch.processor.ValidationErrorSaver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,18 +18,19 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doNothing;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionValidationProcessorTest {
 
     @Mock
-    private ValidationErrorJpaRepository errorRepository;
+    private ValidationErrorSaver errorSaver;
 
     private TransactionValidationProcessor processor;
 
     @BeforeEach
     void setUp() {
-        processor = new TransactionValidationProcessor(errorRepository);
+        processor = new TransactionValidationProcessor(errorSaver);
     }
 
     private TransactionRecord validRecord() {
@@ -54,7 +55,7 @@ class TransactionValidationProcessorTest {
         assertThat(result.getTransactionId()).isEqualTo("TXN-001");
         assertThat(result.getAmountInEur()).isEqualByComparingTo("150.00"); // EUR → rate = 1.0
         assertThat(result.getExchangeRate()).isEqualByComparingTo("1");
-        verifyNoInteractions(errorRepository);
+        verifyNoInteractions(errorSaver);
     }
 
     @Test
@@ -74,13 +75,13 @@ class TransactionValidationProcessorTest {
         TransactionRecord record = validRecord();
         record.setAmount(null);
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("amount is required");
 
-        verify(errorRepository).save(any());
+        verify(errorSaver).save(any());
     }
 
     @Test
@@ -88,7 +89,7 @@ class TransactionValidationProcessorTest {
         TransactionRecord record = validRecord();
         record.setAmount(new BigDecimal("-50.00"));
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class)
@@ -100,7 +101,7 @@ class TransactionValidationProcessorTest {
         TransactionRecord record = validRecord();
         record.setCurrency("XYZ");
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class)
@@ -112,7 +113,7 @@ class TransactionValidationProcessorTest {
         TransactionRecord record = validRecord();
         record.setTransactionId("   ");
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class)
@@ -124,7 +125,7 @@ class TransactionValidationProcessorTest {
         TransactionRecord record = validRecord();
         record.setValueDate(LocalDate.now().plusDays(60));
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class)
@@ -138,12 +139,12 @@ class TransactionValidationProcessorTest {
         record.setAmount(new BigDecimal("-1"));
         record.setCurrency("INVALID");
 
-        when(errorRepository.save(any())).thenReturn(null);
+        doNothing().when(errorSaver).save(any());
 
         assertThatThrownBy(() -> processor.process(record))
                 .isInstanceOf(ValidationException.class);
 
         // 3 errors → 3 saves to the error repository
-        verify(errorRepository, times(3)).save(any());
+        verify(errorSaver, times(3)).save(any());
     }
 }

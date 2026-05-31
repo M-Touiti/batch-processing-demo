@@ -4,7 +4,6 @@ import com.demo.batch.domain.exception.ValidationException;
 import com.demo.batch.domain.model.ProcessedTransaction;
 import com.demo.batch.domain.model.TransactionRecord;
 import com.demo.batch.domain.model.ValidationError;
-import com.demo.batch.infrastructure.persistence.repository.ValidationErrorJpaRepository;
 import com.demo.batch.infrastructure.persistence.entity.ValidationErrorEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +47,11 @@ public class TransactionValidationProcessor
             "JPY", new BigDecimal("162.0")
     );
 
-    private final ValidationErrorJpaRepository errorRepository;
+    private final ValidationErrorSaver errorSaver;
     private String jobId;
 
-    public TransactionValidationProcessor(ValidationErrorJpaRepository errorRepository) {
-        this.errorRepository = errorRepository;
+    public TransactionValidationProcessor(ValidationErrorSaver errorSaver) {
+        this.errorSaver = errorSaver;
     }
 
     @BeforeStep
@@ -134,6 +133,6 @@ public class TransactionValidationProcessor
         entity.setErrorMessage(errorMessage);
         entity.setSeverity("ERROR");
         entity.setCreatedAt(java.time.LocalDateTime.now());
-        errorRepository.save(entity);
+        errorSaver.save(entity);
     }
 }

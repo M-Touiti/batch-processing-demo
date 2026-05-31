@@ -6,6 +6,7 @@ import com.demo.batch.domain.model.ProcessedTransaction;
 import com.demo.batch.domain.model.TransactionRecord;
 import com.demo.batch.infrastructure.batch.listener.TransactionImportJobListener;
 import com.demo.batch.infrastructure.batch.processor.TransactionValidationProcessor;
+import com.demo.batch.infrastructure.batch.processor.ValidationErrorSaver;
 import com.demo.batch.infrastructure.batch.reader.CsvTransactionReader;
 import com.demo.batch.infrastructure.batch.reader.ExcelTransactionReader;
 import com.demo.batch.infrastructure.batch.skip.TransactionSkipPolicy;
@@ -13,7 +14,6 @@ import com.demo.batch.infrastructure.batch.writer.ReportWriterTasklet;
 import com.demo.batch.infrastructure.batch.writer.TransactionJpaWriter;
 import com.demo.batch.infrastructure.persistence.repository.ImportJobJpaRepository;
 import com.demo.batch.infrastructure.persistence.repository.ProcessedTransactionJpaRepository;
-import com.demo.batch.infrastructure.persistence.repository.ValidationErrorJpaRepository;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -62,18 +62,18 @@ public class TransactionImportJobConfig {
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
     private final ProcessedTransactionJpaRepository transactionRepository;
-    private final ValidationErrorJpaRepository errorRepository;
+    private final ValidationErrorSaver validationErrorSaver;
     private final ImportJobJpaRepository importJobRepository;
 
     public TransactionImportJobConfig(JobRepository jobRepository,
                                        PlatformTransactionManager transactionManager,
                                        ProcessedTransactionJpaRepository transactionRepository,
-                                       ValidationErrorJpaRepository errorRepository,
+                                       ValidationErrorSaver validationErrorSaver,
                                        ImportJobJpaRepository importJobRepository) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.transactionRepository = transactionRepository;
-        this.errorRepository = errorRepository;
+        this.validationErrorSaver = validationErrorSaver;
         this.importJobRepository = importJobRepository;
     }
 
@@ -132,7 +132,7 @@ public class TransactionImportJobConfig {
 
     @Bean
     public TransactionValidationProcessor processor() {
-        return new TransactionValidationProcessor(errorRepository);
+        return new TransactionValidationProcessor(validationErrorSaver);
     }
 
     @Bean
