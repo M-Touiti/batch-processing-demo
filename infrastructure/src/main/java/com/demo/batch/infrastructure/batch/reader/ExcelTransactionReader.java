@@ -6,37 +6,38 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.batch.item.ItemReader;
+import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.item.ItemStreamException;
+import org.springframework.batch.item.ItemStreamReader;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 
 /**
- * Custom Spring Batch ItemReader for Excel (.xlsx) transaction files.
+ * Custom Spring Batch ItemStreamReader for Excel (.xlsx) transaction files.
  *
- * Spring Batch does not include a built-in Excel reader.
- * This implementation uses Apache POI to read rows one by one,
- * mimicking the streaming behavior of FlatFileItemReader.
+ * Implements ItemStreamReader so Spring Batch manages the open/close lifecycle,
+ * which is required when used inside a multi-threaded step.
+ * Thread safety is delegated to SynchronizedItemStreamReader (see TransactionImportJobConfig).
  *
  * Expected column layout (row 1 = header, data starts at row 2):
  * A: transactionId | B: accountId | C: amount | D: currency
  * E: type          | F: valueDate | G: description | H: counterpartyId
- *
- * Thread-safety: NOT thread-safe — each partition should use its own instance.
  */
-public class ExcelTransactionReader implements ItemReader<TransactionRecord> {
+public class ExcelTransactionReader implements ItemStreamReader<TransactionRecord> {
 
     private static final Logger log = LoggerFactory.getLogger(ExcelTransactionReader.class);
 
     private final String filePath;
     private final String sourceFile;
+
     private Workbook workbook;
     private Sheet sheet;
     private int currentRowIndex;
-    private boolean initialized = false;
 
     public ExcelTransactionReader(String filePath, String sourceFile) {
         this.filePath = filePath;
@@ -44,47 +45,53 @@ public class ExcelTransactionReader implements ItemReader<TransactionRecord> {
     }
 
     @Override
-    public TransactionRecord read() throws Exception {
-        if (!initialized) {
-            initialize();
+    public void open(ExecutionContext executionContext) throws ItemStreamException {
+        log.info("Opening Excel file: {}", filePath);
+        try {
+            FileInputStream fis = new FileInputStream(filePath);
+            workbook = new XSSFWorkbook(fis);
+            sheet = workbook.getSheetAt(0);
+            currentRowIndex = 1; // row 0 is the header
+            log.info("Excel file loaded: {} data rows to process", sheet.getLastRowNum());
+        } catch (IOException e) {
+            throw new ItemStreamException("Failed to open Excel file: " + filePath, e);
         }
-
-        // Skip header row (row 0)
-        while (currentRowIndex <= sheet.getLastRowNum()) {
-            Row row = sheet.getRow(currentRowIndex);
-            currentRowIndex++;
-
-            if (row == null || isRowEmpty(row)) continue;
-
-            return mapRow(row);
-        }
-
-        // End of file — close workbook
-        if (workbook != null) {
-            workbook.close();
-        }
-        return null;
     }
 
-    private void initialize() throws Exception {
-        log.info("Opening Excel file: {}", filePath);
-        FileInputStream fis = new FileInputStream(filePath);
-        workbook = new XSSFWorkbook(fis);
-        sheet = workbook.getSheetAt(0);
-        currentRowIndex = 1; // Skip header row (index 0)
-        initialized = true;
-        log.info("Excel file loaded: {} rows to process", sheet.getLastRowNum());
+    @Override
+    public void update(ExecutionContext executionContext) throws ItemStreamException {
+        // no restart support needed for this reader
+    }
+
+    @Override
+    public void close() throws ItemStreamException {
+        if (workbook != null) {
+            try {
+                workbook.close();
+            } catch (IOException e) {
+                throw new ItemStreamException("Failed to close Excel workbook", e);
+            }
+        }
+    }
+
+    @Override
+    public TransactionRecord read() {
+        while (currentRowIndex <= sheet.getLastRowNum()) {
+            Row row = sheet.getRow(currentRowIndex++);
+            if (row == null || isRowEmpty(row)) continue;
+            return mapRow(row);
+        }
+        return null;
     }
 
     private TransactionRecord mapRow(Row row) {
         TransactionRecord record = new TransactionRecord();
         record.setSourceFile(sourceFile);
-        record.setLineNumber(row.getRowNum() + 1); // 1-based
+        record.setLineNumber(row.getRowNum() + 1);
 
         record.setTransactionId(getStringValue(row, 0));
         record.setAccountId(getStringValue(row, 1));
 
-        // Amount — column C
         try {
             Cell amountCell = row.getCell(2);
             if (amountCell != null && amountCell.getCellType() == CellType.NUMERIC) {
@@ -97,13 +104,11 @@ public class ExcelTransactionReader implements ItemReader<TransactionRecord> {
 
         record.setCurrency(getStringValue(row, 3));
 
-        // Transaction type — column E
         try {
             String typeStr = getStringValue(row, 4);
             if (typeStr != null) record.setType(TransactionType.valueOf(typeStr.toUpperCase()));
         } catch (IllegalArgumentException ignored) {}
 
-        // Value date — column F (may be a date cell or string)
         try {
             Cell dateCell = row.getCell(5);
             if (dateCell != null && dateCell.getCellType() == CellType.NUMERIC

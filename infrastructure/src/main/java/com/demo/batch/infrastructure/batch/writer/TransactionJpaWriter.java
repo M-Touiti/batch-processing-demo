@@ -9,6 +9,8 @@ import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Spring Batch ItemWriter that persists ProcessedTransaction objects to PostgreSQL.
@@ -28,13 +30,27 @@ public class TransactionJpaWriter implements ItemWriter<ProcessedTransaction> {
 
     @Override
     public void write(Chunk<? extends ProcessedTransaction> chunk) {
-        List<ProcessedTransactionEntity> entities = chunk.getItems().stream()
+        Set<String> incomingIds = chunk.getItems().stream()
+                .map(ProcessedTransaction::getTransactionId)
+                .collect(Collectors.toSet());
+
+        Set<String> alreadyImported = repository.findExistingTransactionIds(incomingIds);
+
+        if (!alreadyImported.isEmpty()) {
+            log.warn("Skipping {} already-imported transaction(s): {}", alreadyImported.size(), alreadyImported);
+        }
+
+        List<ProcessedTransactionEntity> toSave = chunk.getItems().stream()
+                .filter(tx -> !alreadyImported.contains(tx.getTransactionId()))
                 .map(this::toEntity)
                 .toList();
 
-        repository.saveAll(entities);
+        if (!toSave.isEmpty()) {
+            repository.saveAll(toSave);
+        }
 
-        log.debug("Written {} transactions to DB", entities.size());
+        log.debug("Chunk: {} read, {} written, {} skipped (already imported)",
+                chunk.size(), toSave.size(), alreadyImported.size());
     }
 
     private ProcessedTransactionEntity toEntity(ProcessedTransaction tx) {

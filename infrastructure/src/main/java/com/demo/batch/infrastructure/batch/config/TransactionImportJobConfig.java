@@ -16,11 +16,12 @@ import com.demo.batch.infrastructure.persistence.repository.ProcessedTransaction
 import com.demo.batch.infrastructure.persistence.repository.ValidationErrorJpaRepository;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.core.step.tasklet.TaskletStep;
-import org.springframework.batch.item.ItemReader;
+import org.springframework.batch.item.ItemStreamReader;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -93,12 +94,13 @@ public class TransactionImportJobConfig {
     public Step importStep() {
         return new StepBuilder("importStep", jobRepository)
                 .<TransactionRecord, ProcessedTransaction>chunk(CHUNK_SIZE, transactionManager)
-                .reader(csvReader())              // replaced at runtime via JobParameters
+                .reader(transactionReader(null, null, null))
                 .processor(processor())
                 .writer(writer())
                 .faultTolerant()
                 .skipPolicy(new TransactionSkipPolicy(MAX_SKIP_COUNT))
                 .skip(ValidationException.class)
+                .skip(org.springframework.dao.DataIntegrityViolationException.class)
                 .retryLimit(3)
                 .retry(org.springframework.dao.TransientDataAccessException.class)
                 .taskExecutor(taskExecutor())     // parallel chunk processing
@@ -117,15 +119,15 @@ public class TransactionImportJobConfig {
 
     // ── Components ────────────────────────────────────────────────────────────
 
-    /**
-     * Default CSV reader bean — replaced at job launch time via JobParameters.
-     * The actual reader (CSV or Excel) is selected by BatchJobLauncherAdapter.
-     */
     @Bean
-    public ItemReader<TransactionRecord> csvReader() {
-        // Returns a placeholder — real file path is injected at job launch
-        return CsvTransactionReader.create("#{jobParameters['filePath']}",
-                "#{jobParameters['fileName']}");
+    @StepScope
+    public SynchronizedItemStreamReader<TransactionRecord> transactionReader(
+            @Value("#{jobParameters['filePath']}") String filePath,
+            @Value("#{jobParameters['fileName']}") String fileName,
+            @Value("#{jobParameters['fileFormat']}") String fileFormat) {
+        SynchronizedItemStreamReader<TransactionRecord> reader = new SynchronizedItemStreamReader<>();
+        reader.setDelegate(createReader(filePath, fileName, FileFormat.valueOf(fileFormat)));
+        return reader;
     }
 
     @Bean
@@ -153,9 +155,9 @@ public class TransactionImportJobConfig {
      * Builds the correct ItemReader based on the file format job parameter.
      * Called by BatchJobLauncherAdapter at job launch time.
      */
-    public static ItemReader<TransactionRecord> createReader(String filePath,
-                                                              String fileName,
-                                                              FileFormat format) {
+    public static ItemStreamReader<TransactionRecord> createReader(String filePath,
+                                                                   String fileName,
+                                                                   FileFormat format) {
         return switch (format) {
             case CSV   -> CsvTransactionReader.create(filePath, fileName);
             case EXCEL -> new ExcelTransactionReader(filePath, fileName);

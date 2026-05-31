@@ -39,9 +39,15 @@ public class ReportWriterTasklet implements Tasklet {
 
         String jobId = String.valueOf(jobContext.getId());
         String fileName = executionContext.getString("fileName", "unknown");
-        long readCount   = executionContext.getLong("readCount", 0);
-        long writeCount  = executionContext.getLong("writeCount", 0);
-        long skipCount   = executionContext.getLong("skipCount", 0);
+
+        long readCount = 0, writeCount = 0, skipCount = 0;
+        for (var step : jobContext.getStepExecutions()) {
+            if ("importStep".equals(step.getStepName())) {
+                readCount  += step.getReadCount();
+                writeCount += step.getWriteCount();
+                skipCount  += step.getReadSkipCount() + step.getProcessSkipCount() + step.getWriteSkipCount();
+            }
+        }
 
         String reportFileName = "report_" + jobId + "_" + LocalDateTime.now().format(FORMATTER) + ".csv";
         Path reportPath = Path.of(outputDirectory, reportFileName);

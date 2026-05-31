@@ -86,9 +86,9 @@ flowchart LR
 | Feature | Implementation |
 |---|---|
 | **CSV reading** | `FlatFileItemReader` with custom `FieldSetMapper`, handles quoted fields |
-| **Excel reading** | Custom `ItemReader` using Apache POI (Spring Batch has no built-in Excel reader) |
+| **Excel reading** | Custom `ItemStreamReader` using Apache POI (Spring Batch has no built-in Excel reader) |
 | **Validation** | 8 business rules per record (amount, currency, date, required fields) |
-| **Skip policy** | Custom `SkipPolicy` — skips `ValidationException`, fails on other errors |
+| **Skip policy** | Custom `SkipPolicy` — skips `ValidationException` and duplicate-key violations, fails on other errors |
 | **Error tracking** | Invalid records saved to `validation_errors` table + accessible via REST |
 | **Currency conversion** | Converts all amounts to EUR base currency (configurable FX rates) |
 | **Parallel processing** | `ThreadPoolTaskExecutor` with 4 threads for chunk-level parallelism |
@@ -329,7 +329,8 @@ batch-processing-demo/
 
 sample-data/
 ├── transactions_2025_06.csv         ← 15 valid records
-└── transactions_with_errors.csv     ← mix of valid and invalid records
+├── transactions_with_errors.csv     ← mix of valid and invalid records
+└── transactions_sample.xlsx         ← 20 valid Excel records (all currencies + types)
 ```
 
 ---

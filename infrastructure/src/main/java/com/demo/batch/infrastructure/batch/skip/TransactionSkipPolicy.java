@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.step.skip.SkipLimitExceededException;
 import org.springframework.batch.core.step.skip.SkipPolicy;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /**
  * Custom skip policy for the transaction import job.
@@ -41,10 +42,15 @@ public class TransactionSkipPolicy implements SkipPolicy {
         if (throwable instanceof ValidationException) {
             log.debug("Skipping invalid record (skip #{}/{}): {}",
                     skipCount + 1, maxSkipCount, throwable.getMessage());
-            return true;  // skip this record, continue the job
+            return true;
         }
 
-        // Any other exception (DB error, NPE, etc.) → fail the job
+        if (throwable instanceof DataIntegrityViolationException) {
+            log.warn("Skipping duplicate transaction (already imported): {}", throwable.getMessage());
+            return true;
+        }
+
+        // Any other exception (unexpected DB error, NPE, etc.) → fail the job
         log.error("Unrecoverable error during processing — aborting job: {}", throwable.getMessage());
         return false;
     }
