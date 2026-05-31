@@ -9,6 +9,7 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 
 import java.io.FileWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,6 +52,7 @@ public class ReportWriterTasklet implements Tasklet {
 
         String reportFileName = "report_" + jobId + "_" + LocalDateTime.now().format(FORMATTER) + ".csv";
         Path reportPath = Path.of(outputDirectory, reportFileName);
+        Files.createDirectories(reportPath.getParent());
 
         try (CSVWriter writer = new CSVWriter(new FileWriter(reportPath.toFile()))) {
             // Header
